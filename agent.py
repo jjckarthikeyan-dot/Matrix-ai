@@ -17,14 +17,20 @@ MODEL_NAME = "llama3" # You can change this to whatever model you have pulled in
 
 def ask_ollama(prompt):
     system_prompt = """You are a highly capable AI agent acting as a company employee.
-Your task is to analyze user requests and determine the exact bash/terminal command or python code needed to fulfill them on a local Linux machine.
-If the request requires executing a command, output ONLY the command to run, enclosed in triple backticks like so:
+Your task is to analyze user requests and write comprehensive bash or python scripts to fulfill them on a local Linux machine.
+If the request involves multiple steps (e.g., creating a folder, writing code inside it, running a command), write a single script that accomplishes all the steps.
+Output ONLY the code to run, enclosed in triple backticks like so:
 ```bash
-ls -la
+mkdir -p myfolder
+echo 'print("Hello")' > myfolder/hello.py
+python3 myfolder/hello.py
 ```
 or
 ```python
-print("Hello")
+import os
+os.makedirs("myfolder", exist_ok=True)
+with open("myfolder/hello.py", "w") as f:
+    f.write("print('Hello')")
 ```
 Do not provide any other explanations or conversational text, just the code block.
 """
@@ -48,16 +54,17 @@ def execute_command(command_str, lang):
         elif lang == 'python':
             result = subprocess.run(["python3", "-c", command_str], capture_output=True, text=True, timeout=60)
         else:
-            return f"Unsupported language: {lang}"
+            return False, f"Unsupported language: {lang}"
 
         output = result.stdout
-        if result.stderr:
+        if result.returncode != 0 or result.stderr:
             output += f"\nErrors:\n{result.stderr}"
-        return output
+            return False, output
+        return True, output
     except subprocess.TimeoutExpired:
-        return "Command timed out."
+        return False, "Command timed out."
     except Exception as e:
-        return f"Execution error: {str(e)}"
+        return False, f"Execution error: {str(e)}"
 
 def parse_and_execute(ollama_response):
     if "```bash" in ollama_response:
@@ -68,7 +75,7 @@ def parse_and_execute(ollama_response):
         return execute_command(code, 'python')
     else:
          # Fallback if Ollama didn't format correctly
-         return f"Ollama response (no command executed):\n{ollama_response}"
+         return False, f"Ollama response formatting error (no valid code block found):\n{ollama_response}"
 
 def poll_tasks():
     print("Agent started. Polling for tasks...")
@@ -80,17 +87,34 @@ def poll_tasks():
             task.save()
 
             try:
-                print(f"Asking Ollama for task: {task.description}")
-                ollama_response = ask_ollama(task.description)
+                max_retries = 3
+                current_prompt = task.description
+                final_result_log = ""
 
-                print(f"Executing based on Ollama response...")
-                execution_result = parse_and_execute(ollama_response)
+                for attempt in range(max_retries):
+                    print(f"Asking Ollama for task: {task.description} (Attempt {attempt + 1})")
+                    ollama_response = ask_ollama(current_prompt)
+                    final_result_log += f"--- Attempt {attempt + 1} ---\nOllama Suggested:\n{ollama_response}\n\n"
 
-                task.status = 'Completed'
-                task.result = f"Ollama suggested:\n{ollama_response}\n\nExecution Result:\n{execution_result}"
+                    print(f"Executing based on Ollama response...")
+                    success, execution_result = parse_and_execute(ollama_response)
+                    final_result_log += f"Execution Result:\n{execution_result}\n\n"
+
+                    if success:
+                        task.status = 'Completed'
+                        task.result = final_result_log
+                        break
+                    else:
+                        print(f"Execution failed. Retrying... Error: {execution_result}")
+                        current_prompt = f"Previous request: {task.description}\n\nYour previous code failed with the following error:\n{execution_result}\n\nPlease provide corrected code to accomplish the task."
+                else:
+                    # Executed all retries and failed
+                    task.status = 'Failed'
+                    task.result = final_result_log
+
             except Exception as e:
                 task.status = 'Failed'
-                task.result = f"Error: {str(e)}"
+                task.result = f"Fatal Error: {str(e)}"
             finally:
                 task.save()
 
