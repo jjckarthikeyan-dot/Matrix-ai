@@ -8,7 +8,7 @@ Matrix AI is a prototype that connects a Django task dashboard to a Python worke
 
 ## Architecture
 
-\`\`\`text
+```text
 Django dashboard
       |
       v
@@ -27,47 +27,47 @@ Host command execution*
 Task result stored in database
 
 * Experimental and potentially unsafe without isolation.
-\`\`\`
+```
 
 ## Requirements
 
 - Python 3.8 or newer, subject to dependency compatibility
 - A local Ollama installation
-- The \`llama3\` model, unless the worker's model setting is changed
-- Python dependencies from \`requirements.txt\`
+- The `llama3` model, unless the worker's model setting is changed
+- Python dependencies from `requirements.txt`
 
 ## Local setup
 
-\`\`\`bash
+```bash
 git clone https://github.com/jjckarthikeyan-dot/Matrix-ai.git
 cd Matrix-ai
 ollama pull llama3
 python -m venv .venv
-\`\`\`
+```
 
 Activate the environment:
 
-- macOS/Linux: \`source .venv/bin/activate\`
-- Windows PowerShell: \`.venv\Scripts\Activate.ps1\`
+- macOS/Linux: `source .venv/bin/activate`
+- Windows PowerShell: `.venv\Scripts\Activate.ps1`
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
 python manage.py migrate
-\`\`\`
+```
 
 Start the dashboard in one terminal:
 
-\`\`\`bash
+```bash
 python manage.py runserver
-\`\`\`
+```
 
 Open http://127.0.0.1:8000/ to inspect the dashboard.
 
 The existing prototype also documents a separate worker process:
 
-\`\`\`bash
+```bash
 python agent.py
-\`\`\`
+```
 
 **Only start the worker in an isolated test environment after inspecting its command-execution behavior.** The dashboard alone is the safer first step for exploring the interface.
 
