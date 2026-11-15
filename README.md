@@ -1,48 +1,95 @@
-# Company AI Agent
+# Matrix AI — Local Task Agent Prototype
 
-This project sets up a local, free AI agent acting as a company employee. It utilizes Django for a dashboard to assign tasks and view results, and a Python script (`agent.py`) that polls the database and uses an existing local Ollama installation to execute tasks on the host machine.
+**Python · Django · Ollama · Local AI**
 
-## Prerequisites
+Matrix AI is a prototype that connects a Django task dashboard to a Python worker backed by a locally running Ollama model. The dashboard records work requests; the worker polls for pending tasks, sends prompts to the model, and records results.
 
-- Python 3.8+
-- [Ollama](https://ollama.com/) installed and running locally
-- The `llama3` model pulled in Ollama.
+> **Security warning:** The documented worker can execute model-generated commands on the host computer. Treat this as experimental software. Do not run it with elevated privileges, untrusted tasks, or access to sensitive files. Review command execution and add sandboxing, allowlists, and approval checks before wider use.
 
-## Setup Instructions
+## Architecture
 
-1. **Start Ollama and Pull Model**
-   Ensure Ollama is running. Pull the required model if you haven't already:
-   ```bash
-   ollama pull llama3
-   ```
-   *(Note: You can change the model used by editing the `MODEL_NAME` variable in `agent.py`)*
+```text
+Django dashboard
+      |
+      v
+Task database (SQLite)
+      |
+      v
+Python agent worker
+      |
+      v
+Local Ollama model
+      |
+      v
+Host command execution*
+      |
+      v
+Task result stored in database
 
-2. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+* Experimental and potentially unsafe without isolation.
+```
 
-3. **Database Setup**
-   Run the initial migrations to set up the SQLite database:
-   ```bash
-   python manage.py makemigrations
-   python manage.py migrate
-   ```
+## Requirements
 
-## Running the Application
+- Python 3.8 or newer, subject to dependency compatibility
+- A local Ollama installation
+- The `llama3` model, unless the worker's model setting is changed
+- Python dependencies from `requirements.txt`
 
-You need two terminal windows to run both the dashboard and the background agent.
+## Local setup
 
-1. **Start the Django Dashboard**
-   In the first terminal, run:
-   ```bash
-   python manage.py runserver
-   ```
-   Access the dashboard at `http://127.0.0.1:8000/`. You can create new tasks here.
+```bash
+git clone https://github.com/jjckarthikeyan-dot/Matrix-ai.git
+cd Matrix-ai
+ollama pull llama3
+python -m venv .venv
+```
 
-2. **Start the AI Agent**
-   In the second terminal, start the background polling agent:
-   ```bash
-   python agent.py
-   ```
-   The agent will continuously look for tasks in the "Pending" state, ask Ollama for the appropriate command, execute it locally, and save the result back to the database.
+Activate the environment:
+
+- macOS/Linux: `source .venv/bin/activate`
+- Windows PowerShell: `.venv\Scripts\Activate.ps1`
+
+```bash
+pip install -r requirements.txt
+python manage.py migrate
+```
+
+Start the dashboard in one terminal:
+
+```bash
+python manage.py runserver
+```
+
+Open http://127.0.0.1:8000/ to inspect the dashboard.
+
+The existing prototype also documents a separate worker process:
+
+```bash
+python agent.py
+```
+
+**Only start the worker in an isolated test environment after inspecting its command-execution behavior.** The dashboard alone is the safer first step for exploring the interface.
+
+## Current scope
+
+- Task entry through a Django dashboard
+- Polling for pending work
+- Local language-model integration through Ollama
+- Persisting task results in the application database
+
+## Before production use
+
+1. Require human approval for consequential tool actions.
+2. Execute commands within a restricted sandbox rather than the host.
+3. Add access controls, secret management, audit logging, and rate limits.
+4. Add automated tests, error handling, and deployment documentation.
+5. Record measured task reliability and latency rather than assuming production readiness.
+
+## Project status
+
+Experimental prototype. Not described as autonomous, production-ready, or security-hardened.
+
+## Author
+
+[Karthikeyan Jammalamadaka](https://github.com/jjckarthikeyan-dot)
